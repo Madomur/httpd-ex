@@ -23,28 +23,17 @@ pipeline {
       }
     }
 
-    stage('clean up') {
-      steps {
-        script {
-          openshift.withCluster() {
-            openshift.withProject() {
-              templates = openshift.selector("all", [ template : templateName ])
-              templates.delete()
-              if (openshift.selector('secrets', templateName).exists()) {
-                openshift.selector('secrets', templateName).delete()
-              }
-            }
-          }
-        }
-      }
-    }
 
     stage('create') {
       steps {
         script {
           openshift.withCluster() {
             openshift.withProject() {
-              openshift.newApp(templatePath)
+              if (! openshift.selector('dc', templateName).exists()) {
+                openshift.newApp(templatePath, "--param=SOURCE_REPOSITORY_URL=https://github.com/Madomur/httpd-ex.git")
+              } else {
+                openshift.selector('bc', templateName).startBuild()
+              }
             }
           }
         }
@@ -56,7 +45,7 @@ pipeline {
         script {
           openshift.withCluster() {
             openshift.withProject() {
-              def builds = openshift.selector('bc', templateName).related('builds')
+              def builds = openshift.selector('bc', "httpd-example-pipline").related('builds')
               timeout(5) {
 
                 builds.untilEach(1) {
